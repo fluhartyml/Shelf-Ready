@@ -57,7 +57,7 @@ final class IconLayer {
     // Pixel layer: a square paint grid. The "pixel" is a chosen ART UNIT (16/32/64), decoupled
     // from device pixels — composited NEAREST-NEIGHBOR so it stays crisp blocks at 1024, never
     // blurred. Buffer is RGBA8, row-major (pixelGridSize² × 4 bytes); nil = empty/clear.
-    var pixelGridSize: Int = 32
+    var pixelGridSize: Int = 64
     @Attribute(.externalStorage) var pixelData: Data?
 
     var colorHex: String = "#FFFFFF"      // tint for symbol layers

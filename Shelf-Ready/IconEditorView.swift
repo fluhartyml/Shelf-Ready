@@ -258,8 +258,8 @@ struct IconEditorView: View {
 
     private func addPixelLayer() {
         let layer = IconLayer(kind: .pixel)
-        layer.pixelGridSize = 32
-        layer.pixelData = PixelGrid.blank(size: 32)
+        layer.pixelGridSize = 64
+        layer.pixelData = PixelGrid.blank(size: 64)
         layer.scale = 1.0                       // fill the canvas like a paint surface
         layer.order = (document.layers ?? []).count
         layer.document = document
@@ -343,9 +343,12 @@ struct PixelPaintView: View {
 
     @State private var tool: Tool = .pencil
     @State private var colorHex = "#000000"
-    @State private var size = 32
+    @State private var size = 64
     @State private var buffer: [UInt8] = []
     @State private var showGrid = true
+    @State private var zoom: CGFloat = 1
+    @State private var baseZoom: CGFloat = 1
+    private let baseEdge: CGFloat = 300     // canvas edge at 1× (whole icon fits)
 
     private let palette = ["#FFFFFF", "#000000", "#0A84FF", "#32D7FF", "#5E5CE6", "#30D158", "#FF453A", "#FFD60A"]
 
@@ -378,11 +381,12 @@ struct PixelPaintView: View {
                     }
                 }
 
-                // Canvas
-                GeometryReader { geo in
-                    let edge = min(geo.size.width, geo.size.height)
+                // Canvas — MS-Paint zoom: at 1× the whole icon fits (judge it at size);
+                // zoom in to reveal the editable 64×64 grid. Scroll to pan, pinch/slider to zoom.
+                ScrollView([.horizontal, .vertical]) {
+                    let canvasPx = baseEdge * zoom
+                    let cellPx = canvasPx / CGFloat(size)
                     Canvas { ctx, _ in
-                        let cell = edge / CGFloat(size)
                         for y in 0..<size {
                             for x in 0..<size {
                                 let i = (y * size + x) * 4
@@ -392,28 +396,39 @@ struct PixelPaintView: View {
                                     green: Double(buffer[i + 1]) / 255,
                                     blue: Double(buffer[i + 2]) / 255,
                                     opacity: Double(buffer[i + 3]) / 255)
-                                ctx.fill(Path(CGRect(x: CGFloat(x) * cell, y: CGFloat(y) * cell,
-                                                     width: cell, height: cell)), with: .color(color))
+                                ctx.fill(Path(CGRect(x: CGFloat(x) * cellPx, y: CGFloat(y) * cellPx,
+                                                     width: cellPx, height: cellPx)), with: .color(color))
                             }
                         }
-                        if showGrid {
+                        if showGrid && cellPx >= 10 {   // grid only once cells are big enough to edit
                             var grid = Path()
                             for k in 0...size {
-                                let p = CGFloat(k) * cell
-                                grid.move(to: CGPoint(x: p, y: 0)); grid.addLine(to: CGPoint(x: p, y: edge))
-                                grid.move(to: CGPoint(x: 0, y: p)); grid.addLine(to: CGPoint(x: edge, y: p))
+                                let p = CGFloat(k) * cellPx
+                                grid.move(to: CGPoint(x: p, y: 0)); grid.addLine(to: CGPoint(x: p, y: canvasPx))
+                                grid.move(to: CGPoint(x: 0, y: p)); grid.addLine(to: CGPoint(x: canvasPx, y: p))
                             }
-                            ctx.stroke(grid, with: .color(.secondary.opacity(0.25)), lineWidth: 0.5)
+                            ctx.stroke(grid, with: .color(.secondary.opacity(0.3)), lineWidth: 0.5)
                         }
                     }
-                    .frame(width: edge, height: edge)
+                    .frame(width: canvasPx, height: canvasPx)
                     .background(Color(white: 0.92))
                     .overlay(Rectangle().strokeBorder(.secondary))
                     .gesture(DragGesture(minimumDistance: 0)
-                        .onChanged { paint(at: $0.location, edge: edge) }
+                        .onChanged { paint(at: $0.location, px: canvasPx) }
                         .onEnded { _ in commit() })
                 }
-                .aspectRatio(1, contentMode: .fit)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .gesture(MagnifyGesture()
+                    .onChanged { zoom = max(1, min(20, baseZoom * $0.magnification)) }
+                    .onEnded { _ in baseZoom = zoom })
+
+                // Zoom (1× = whole icon · zoom in to paint individual pixels)
+                HStack(spacing: 10) {
+                    Image(systemName: "minus.magnifyingglass").foregroundStyle(.secondary)
+                    Slider(value: $zoom, in: 1...20) { _ in baseZoom = zoom }
+                    Image(systemName: "plus.magnifyingglass").foregroundStyle(.secondary)
+                    Text("\(Int(zoom * 100))%").font(.caption.monospacedDigit()).frame(width: 52, alignment: .trailing)
+                }
             }
             .padding()
             .navigationTitle("Pixel Art — \(size)×\(size)")
@@ -446,9 +461,9 @@ struct PixelPaintView: View {
         layer.document?.updatedAt = Date()
     }
 
-    private func paint(at location: CGPoint, edge: CGFloat) {
-        let cx = Int(location.x / edge * CGFloat(size))
-        let cy = Int(location.y / edge * CGFloat(size))
+    private func paint(at location: CGPoint, px: CGFloat) {
+        let cx = Int(location.x / px * CGFloat(size))
+        let cy = Int(location.y / px * CGFloat(size))
         guard cx >= 0, cx < size, cy >= 0, cy < size else { return }
         switch tool {
         case .pencil:     setCell(cx, cy, PixelGrid.rgba(fromHex: colorHex))
