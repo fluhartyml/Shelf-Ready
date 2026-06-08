@@ -43,9 +43,16 @@ struct ContentView: View {
             if let selection {
                 ProjectBoardView(project: selection)
             } else {
-                ContentUnavailableView("Select an app",
-                                       systemImage: "square.stack.3d.up.fill",
-                                       description: Text("Create or pick an app to prepare its App Store screenshots."))
+                ContentUnavailableView {
+                    Label("Select an app", systemImage: "square.stack.3d.up.fill")
+                } description: {
+                    Text("Create or pick an app to prepare its App Store screenshots.")
+                } actions: {
+                    Button(action: addProject) {
+                        Label("Create App", systemImage: "plus")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
             }
         }
     }
