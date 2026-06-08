@@ -168,7 +168,7 @@ struct IconEditorView: View {
             }
             .sheet(isPresented: $editingPixels) {
                 if let layer = selected, layer.kind == .pixel {
-                    PixelPaintView(layer: layer)
+                    PixelPaintView(layer: layer, document: document)
                 }
             }
             .safeAreaInset(edge: .bottom) {
@@ -326,6 +326,7 @@ struct IconEditorView: View {
 
 struct PixelPaintView: View {
     @Bindable var layer: IconLayer
+    let document: IconDocument
     @Environment(\.dismiss) private var dismiss
 
     enum Tool: String, CaseIterable, Identifiable {
@@ -346,11 +347,17 @@ struct PixelPaintView: View {
     @State private var size = 128
     @State private var buffer: [UInt8] = []
     @State private var showGrid = true
+    @State private var showContext = true
     @State private var zoom: CGFloat = 1
     @State private var baseZoom: CGFloat = 1
     private let baseEdge: CGFloat = 300     // canvas edge at 1× (whole icon fits)
 
     private let palette = ["#FFFFFF", "#000000", "#0A84FF", "#32D7FF", "#5E5CE6", "#30D158", "#FF453A", "#FFD60A"]
+
+    /// Visible layers that sit BELOW this pixel layer — shown as live editing context.
+    private var layersBelow: [IconLayer] {
+        document.orderedLayers.filter { $0.isVisible && $0.order < layer.order }
+    }
 
     var body: some View {
         NavigationStack {
@@ -367,6 +374,7 @@ struct PixelPaintView: View {
                         .buttonStyle(.bordered)
                     }
                     Spacer()
+                    Toggle(isOn: $showContext) { Image(systemName: "rectangle.stack") }.toggleStyle(.button)
                     Toggle(isOn: $showGrid) { Image(systemName: "grid") }.toggleStyle(.button)
                 }
 
@@ -381,37 +389,45 @@ struct PixelPaintView: View {
                     }
                 }
 
-                // Canvas — MS-Paint zoom: at 1× the whole grid fits; zoom in to paint pixels.
-                // Chunky cells are a CREATION aid only — the icon composites smoothed at full res.
+                // Canvas — MS-Paint zoom + live context: the layers BELOW composite under the
+                // grid (smoothed, real) so you draw the pixel art over the star in place. The
+                // chunky grid is a creation aid; the icon itself composites smoothed at full res.
                 ScrollView([.horizontal, .vertical]) {
                     let canvasPx = baseEdge * zoom
                     let cellPx = canvasPx / CGFloat(size)
-                    Canvas { ctx, _ in
-                        for y in 0..<size {
-                            for x in 0..<size {
-                                let i = (y * size + x) * 4
-                                guard i + 3 < buffer.count, buffer[i + 3] > 0 else { continue }
-                                let color = Color(.sRGB,
-                                    red: Double(buffer[i]) / 255,
-                                    green: Double(buffer[i + 1]) / 255,
-                                    blue: Double(buffer[i + 2]) / 255,
-                                    opacity: Double(buffer[i + 3]) / 255)
-                                ctx.fill(Path(CGRect(x: CGFloat(x) * cellPx, y: CGFloat(y) * cellPx,
-                                                     width: cellPx, height: cellPx)), with: .color(color))
-                            }
+                    ZStack {
+                        if showContext {
+                            Color(hexString: document.backgroundHex)
+                            ForEach(layersBelow) { IconLayerContent(layer: $0, edge: canvasPx) }
+                        } else {
+                            Color(white: 0.92)
                         }
-                        if showGrid && cellPx >= 10 {   // grid only once cells are big enough to edit
-                            var grid = Path()
-                            for k in 0...size {
-                                let p = CGFloat(k) * cellPx
-                                grid.move(to: CGPoint(x: p, y: 0)); grid.addLine(to: CGPoint(x: p, y: canvasPx))
-                                grid.move(to: CGPoint(x: 0, y: p)); grid.addLine(to: CGPoint(x: canvasPx, y: p))
+                        Canvas { ctx, _ in
+                            for y in 0..<size {
+                                for x in 0..<size {
+                                    let i = (y * size + x) * 4
+                                    guard i + 3 < buffer.count, buffer[i + 3] > 0 else { continue }
+                                    let color = Color(.sRGB,
+                                        red: Double(buffer[i]) / 255,
+                                        green: Double(buffer[i + 1]) / 255,
+                                        blue: Double(buffer[i + 2]) / 255,
+                                        opacity: Double(buffer[i + 3]) / 255)
+                                    ctx.fill(Path(CGRect(x: CGFloat(x) * cellPx, y: CGFloat(y) * cellPx,
+                                                         width: cellPx, height: cellPx)), with: .color(color))
+                                }
                             }
-                            ctx.stroke(grid, with: .color(.secondary.opacity(0.3)), lineWidth: 0.5)
+                            if showGrid && cellPx >= 10 {   // grid only once cells are big enough to edit
+                                var grid = Path()
+                                for k in 0...size {
+                                    let p = CGFloat(k) * cellPx
+                                    grid.move(to: CGPoint(x: p, y: 0)); grid.addLine(to: CGPoint(x: p, y: canvasPx))
+                                    grid.move(to: CGPoint(x: 0, y: p)); grid.addLine(to: CGPoint(x: canvasPx, y: p))
+                                }
+                                ctx.stroke(grid, with: .color(.secondary.opacity(0.3)), lineWidth: 0.5)
+                            }
                         }
                     }
                     .frame(width: canvasPx, height: canvasPx)
-                    .background(Color(white: 0.92))
                     .overlay(Rectangle().strokeBorder(.secondary))
                     .gesture(DragGesture(minimumDistance: 0)
                         .onChanged { paint(at: $0.location, px: canvasPx) }
