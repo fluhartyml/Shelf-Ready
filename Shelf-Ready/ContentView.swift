@@ -36,7 +36,7 @@ struct ContentView: View {
             .navigationTitle("Shelf-Ready")
             .toolbar {
                 ToolbarItem {
-                    Button(action: addProject) { Label("New App", systemImage: "plus") }
+                    Button(action: addProject) { Label("New Asset Library", systemImage: "plus") }
                 }
             }
         } detail: {
@@ -44,12 +44,12 @@ struct ContentView: View {
                 ProjectBoardView(project: selection)
             } else {
                 ContentUnavailableView {
-                    Label("Select an app", systemImage: "square.stack.3d.up.fill")
+                    Label("Select an asset library", systemImage: "square.stack.3d.up.fill")
                 } description: {
-                    Text("Create or pick an app to prepare its App Store screenshots.")
+                    Text("Create an asset library to prepare an app's App Store icon and screenshots.")
                 } actions: {
                     Button(action: addProject) {
-                        Label("Create App", systemImage: "plus")
+                        Label("New Asset Library", systemImage: "plus")
                     }
                     .buttonStyle(.borderedProminent)
                 }
@@ -58,7 +58,7 @@ struct ContentView: View {
     }
 
     private func addProject() {
-        let p = ScreenshotProject(name: "Untitled App")
+        let p = ScreenshotProject(name: "Untitled")
         modelContext.insert(p)
         selection = p
     }
@@ -85,7 +85,7 @@ struct ProjectBoardView: View {
     var body: some View {
         List {
             Section {
-                TextField("App name", text: $project.name)
+                TextField("Library name", text: $project.name)
                     .font(.title3.weight(.semibold))
             }
             ForEach(project.orderedShots) { shot in
@@ -96,7 +96,7 @@ struct ProjectBoardView: View {
             .onMove(perform: move)
             .onDelete(perform: delete)
         }
-        .navigationTitle(project.name.isEmpty ? "Untitled App" : project.name)
+        .navigationTitle(project.name.isEmpty ? "Untitled" : project.name)
         .toolbar {
             ToolbarItemGroup {
                 Menu {
