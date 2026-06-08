@@ -54,10 +54,11 @@ final class IconLayer {
     /// Image layer: imported artwork.
     @Attribute(.externalStorage) var imageData: Data?
 
-    // Pixel layer: a square paint grid. The "pixel" is a chosen ART UNIT (16/32/64), decoupled
-    // from device pixels — composited NEAREST-NEIGHBOR so it stays crisp blocks at 1024, never
-    // blurred. Buffer is RGBA8, row-major (pixelGridSize² × 4 bytes); nil = empty/clear.
-    var pixelGridSize: Int = 64
+    // Pixel layer: a square paint grid used ONLY for creation (hand-drawing artwork). The
+    // chunky grid is an editing aid; in the final icon the layer composites at FULL resolution
+    // (smoothed) to match the other full-res layers — not blocky. RGBA8 row-major buffer
+    // (pixelGridSize² × 4 bytes); nil = empty/clear.
+    var pixelGridSize: Int = 128
     @Attribute(.externalStorage) var pixelData: Data?
 
     var colorHex: String = "#FFFFFF"      // tint for symbol layers
@@ -119,7 +120,7 @@ enum PixelGrid {
             bytesPerRow: size * bytesPerPixel,
             space: sRGB,
             bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
-            provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent
+            provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent
         )
     }
 

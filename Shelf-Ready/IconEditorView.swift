@@ -76,7 +76,7 @@ struct IconLayerContent: View {
         case .pixel:
             if let cg = PixelGrid.cgImage(from: layer.pixelData, size: layer.pixelGridSize) {
                 Image(decorative: cg, scale: 1)
-                    .resizable().interpolation(.none).scaledToFit()   // nearest-neighbor: no blur
+                    .resizable().interpolation(.high).scaledToFit()   // smoothed → full-res production icon
             } else {
                 Color.clear
             }
@@ -209,7 +209,7 @@ struct IconEditorView: View {
                         layer.pixelGridSize = newSize
                         layer.pixelData = PixelGrid.blank(size: newSize)   // resizing clears the grid
                     })) {
-                    Text("16").tag(16); Text("32").tag(32); Text("64").tag(64)
+                    Text("64").tag(64); Text("128").tag(128)
                 }
                 .pickerStyle(.segmented).labelsHidden()
                 Button { editingPixels = true } label: {
@@ -258,8 +258,8 @@ struct IconEditorView: View {
 
     private func addPixelLayer() {
         let layer = IconLayer(kind: .pixel)
-        layer.pixelGridSize = 64
-        layer.pixelData = PixelGrid.blank(size: 64)
+        layer.pixelGridSize = 128
+        layer.pixelData = PixelGrid.blank(size: 128)
         layer.scale = 1.0                       // fill the canvas like a paint surface
         layer.order = (document.layers ?? []).count
         layer.document = document
@@ -343,7 +343,7 @@ struct PixelPaintView: View {
 
     @State private var tool: Tool = .pencil
     @State private var colorHex = "#000000"
-    @State private var size = 64
+    @State private var size = 128
     @State private var buffer: [UInt8] = []
     @State private var showGrid = true
     @State private var zoom: CGFloat = 1
@@ -381,8 +381,8 @@ struct PixelPaintView: View {
                     }
                 }
 
-                // Canvas — MS-Paint zoom: at 1× the whole icon fits (judge it at size);
-                // zoom in to reveal the editable 64×64 grid. Scroll to pan, pinch/slider to zoom.
+                // Canvas — MS-Paint zoom: at 1× the whole grid fits; zoom in to paint pixels.
+                // Chunky cells are a CREATION aid only — the icon composites smoothed at full res.
                 ScrollView([.horizontal, .vertical]) {
                     let canvasPx = baseEdge * zoom
                     let cellPx = canvasPx / CGFloat(size)
