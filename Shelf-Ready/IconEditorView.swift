@@ -11,6 +11,11 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 // MARK: - Color hex helper
 
@@ -94,6 +99,7 @@ struct IconEditorView: View {
     @State private var selected: IconLayer?
     @State private var exporting = false
     @State private var editingPixels = false
+    @State private var pickingSymbol = false
     @State private var status = ""
 
     private let canvasEdge: CGFloat = 320
@@ -171,6 +177,13 @@ struct IconEditorView: View {
                     PixelPaintView(layer: layer, document: document)
                 }
             }
+            .sheet(isPresented: $pickingSymbol) {
+                if let layer = selected, layer.kind == .symbol {
+                    SymbolPickerView(symbolName: Binding(
+                        get: { layer.symbolName ?? "star.fill" },
+                        set: { layer.symbolName = $0 }))
+                }
+            }
             .safeAreaInset(edge: .bottom) {
                 if !status.isEmpty {
                     Text(status).font(.callout).padding(8)
@@ -193,7 +206,11 @@ struct IconEditorView: View {
     @ViewBuilder private func inspector(for layer: IconLayer) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             if layer.kind == .symbol {
-                TextField("SF Symbol name", text: Binding(
+                Button { pickingSymbol = true } label: {
+                    Label { Text("Choose Symbol…") } icon: { Image(systemName: layer.symbolName ?? "star.fill") }
+                }
+                .buttonStyle(.borderedProminent)
+                TextField("…or type an exact SF Symbol name", text: Binding(
                     get: { layer.symbolName ?? "" },
                     set: { layer.symbolName = $0 }))
                     .textFieldStyle(.roundedBorder)
@@ -254,6 +271,7 @@ struct IconEditorView: View {
         modelContext.insert(layer)
         selected = layer
         document.updatedAt = Date()
+        pickingSymbol = true        // let the user choose the glyph right away
     }
 
     private func addPixelLayer() {
@@ -522,4 +540,131 @@ struct PixelPaintView: View {
             stack.append((cx, cy + 1)); stack.append((cx, cy - 1))
         }
     }
+}
+
+// MARK: - SF Symbol picker (curated, searchable, runtime-filtered to what resolves on this OS)
+
+struct SymbolPickerView: View {
+    @Binding var symbolName: String
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var search = ""
+    @State private var resolved: [String] = []
+
+    private let columns = [GridItem(.adaptive(minimum: 54), spacing: 8)]
+
+    private var shown: [String] {
+        guard !search.isEmpty else { return resolved }
+        let q = search.lowercased()
+        return resolved.filter { $0.contains(q) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 8) {
+                    ForEach(shown, id: \.self) { name in
+                        Button {
+                            symbolName = name
+                            dismiss()
+                        } label: {
+                            Image(systemName: name)
+                                .font(.title2)
+                                .frame(width: 50, height: 50)
+                                .background(symbolName == name ? Color.accentColor.opacity(0.3)
+                                                                : Color.secondary.opacity(0.12))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+                        .help(name)
+                    }
+                }
+                .padding()
+            }
+            .searchable(text: $search, prompt: "Search \(resolved.count) symbols")
+            .navigationTitle("SF Symbols")
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } } }
+            .onAppear {
+                if resolved.isEmpty { resolved = Self.curated.filter(Self.resolves) }
+            }
+        }
+        .frame(minWidth: 360, minHeight: 420)
+    }
+
+    /// True only if the symbol actually exists on this OS version (keeps broken glyphs out).
+    static func resolves(_ name: String) -> Bool {
+        #if canImport(UIKit)
+        return UIImage(systemName: name) != nil
+        #elseif canImport(AppKit)
+        return NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil
+        #else
+        return true
+        #endif
+    }
+
+    /// A broad starter set across categories. Anything that doesn't resolve is filtered out,
+    /// so it's safe to list liberally; the text field covers anything not here.
+    static let curated: [String] = [
+        // Shapes & marks
+        "star", "star.fill", "star.circle", "heart", "heart.fill", "circle", "circle.fill",
+        "square", "square.fill", "triangle", "triangle.fill", "diamond", "diamond.fill",
+        "hexagon", "hexagon.fill", "octagon", "octagon.fill", "seal", "seal.fill",
+        "shield", "shield.fill", "flag", "flag.fill", "flag.checkered", "bookmark", "bookmark.fill",
+        "tag", "tag.fill", "bolt", "bolt.fill", "sparkles", "sparkle", "crown", "crown.fill",
+        "rosette", "trophy", "trophy.fill", "medal", "medal.fill",
+        // People & hands
+        "person", "person.fill", "person.2", "person.2.fill", "person.3.fill",
+        "person.crop.circle", "figure.stand", "figure.walk", "figure.run", "figure.wave",
+        "hand.raised", "hand.raised.fill", "hand.thumbsup", "hand.thumbsup.fill",
+        "hand.thumbsdown", "hand.point.up.left", "eye", "eye.fill", "face.smiling", "brain.head.profile",
+        // Nature, weather & animals
+        "sun.max", "sun.max.fill", "moon", "moon.fill", "moon.stars", "moon.stars.fill",
+        "cloud", "cloud.fill", "cloud.rain", "cloud.rain.fill", "cloud.bolt", "cloud.snow",
+        "snowflake", "wind", "tornado", "flame", "flame.fill", "drop", "drop.fill",
+        "leaf", "leaf.fill", "tree", "globe", "globe.americas.fill", "mountain.2", "mountain.2.fill",
+        "bird", "bird.fill", "ant", "ant.fill", "ladybug", "ladybug.fill", "hare", "hare.fill",
+        "tortoise", "tortoise.fill", "pawprint", "pawprint.fill", "fish", "fish.fill", "cat", "dog",
+        // Objects & tools
+        "house", "house.fill", "building.2", "building.2.fill", "building.columns",
+        "gear", "gearshape", "gearshape.fill", "gearshape.2", "wrench.adjustable", "wrench.adjustable.fill",
+        "hammer", "hammer.fill", "wrench.and.screwdriver", "screwdriver", "paintbrush",
+        "paintbrush.fill", "paintbrush.pointed", "paintbrush.pointed.fill", "paintpalette",
+        "pencil", "pencil.tip", "scissors", "paperclip", "link", "lock", "lock.fill", "lock.open",
+        "key", "key.fill", "bell", "bell.fill", "alarm", "clock", "clock.fill", "stopwatch",
+        "timer", "hourglass", "calendar", "gift", "gift.fill", "cart", "cart.fill", "bag", "bag.fill",
+        "creditcard", "creditcard.fill", "dollarsign.circle", "banknote", "briefcase", "briefcase.fill",
+        "folder", "folder.fill", "doc", "doc.fill", "doc.text", "book", "book.fill",
+        "books.vertical", "newspaper", "graduationcap", "graduationcap.fill", "backpack",
+        "ruler", "paperplane", "paperplane.fill", "envelope", "envelope.fill", "tray", "tray.fill",
+        "archivebox", "trash", "trash.fill",
+        // Media & sound
+        "camera", "camera.fill", "photo", "photo.fill", "video", "video.fill", "film",
+        "music.note", "music.note.list", "headphones", "mic", "mic.fill", "speaker.wave.2",
+        "speaker.wave.2.fill", "guitars", "pianokeys", "megaphone", "megaphone.fill",
+        "play.fill", "pause.fill", "stop.fill",
+        // Devices & tech
+        "desktopcomputer", "laptopcomputer", "display", "iphone", "ipad", "applewatch",
+        "airpods", "keyboard", "printer", "tv", "tv.fill", "gamecontroller", "gamecontroller.fill",
+        "cpu", "memorychip", "externaldrive", "internaldrive", "server.rack", "wifi",
+        "antenna.radiowaves.left.and.right", "network", "battery.100", "bolt.batteryblock",
+        // Transport & places
+        "car", "car.fill", "bus", "tram", "airplane", "ferry", "sailboat", "bicycle",
+        "fuelpump", "fuelpump.fill", "map", "map.fill", "location", "location.fill",
+        "mappin", "mappin.circle", "signpost.right",
+        // Food
+        "cup.and.saucer", "cup.and.saucer.fill", "mug", "mug.fill", "fork.knife",
+        "takeoutbag.and.cup.and.straw", "birthday.cake", "carrot",
+        // Health & sport
+        "cross", "cross.fill", "cross.case", "pills", "pills.fill", "bandage", "stethoscope",
+        "bed.double", "dumbbell", "dumbbell.fill", "sportscourt", "soccerball", "basketball.fill",
+        "football.fill", "tennis.racket",
+        // Symbols & UI
+        "plus", "minus", "checkmark", "checkmark.circle", "checkmark.circle.fill", "xmark",
+        "xmark.circle", "exclamationmark.triangle", "questionmark.circle", "info.circle",
+        "magnifyingglass", "slider.horizontal.3", "line.3.horizontal", "ellipsis", "ellipsis.circle",
+        "arrow.up", "arrow.down", "arrow.left", "arrow.right", "arrow.up.right",
+        "arrow.clockwise", "arrow.triangle.2.circlepath", "arrowshape.turn.up.left",
+        "chevron.right", "chevron.left", "power", "wand.and.stars", "wand.and.rays",
+        "atom", "function", "infinity", "command", "flashlight.on.fill"
+    ]
 }
