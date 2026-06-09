@@ -30,14 +30,27 @@ struct ContentView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     .tag(project)
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            deleteProject(project)
+                        } label: {
+                            Label("Delete Asset Set", systemImage: "trash")
+                        }
+                    }
                 }
                 .onDelete(perform: deleteProjects)
             }
             .navigationTitle("Shelf-Ready")
-            .toolbar {
-                ToolbarItem {
-                    Button(action: addProject) { Label("New Asset Set", systemImage: "plus") }
+            .safeAreaInset(edge: .bottom) {
+                // New Asset Set lives in the sidebar BODY, not the toolbar — a lone sidebar
+                // toolbar item collapses into a ">>" overflow when the column is narrow (the
+                // bug that hid this button on the Mac). A pinned body button can't overflow.
+                Button(action: addProject) {
+                    Label("New Asset Set", systemImage: "plus")
+                        .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(.borderedProminent)
+                .padding()
             }
         } detail: {
             if let selection {
@@ -67,11 +80,14 @@ struct ContentView: View {
         selection = p
     }
 
+    private func deleteProject(_ project: ScreenshotProject) {
+        if selection?.persistentModelID == project.persistentModelID { selection = nil }
+        ICloudProjectStore.deleteFolder(for: project)
+        modelContext.delete(project)
+    }
+
     private func deleteProjects(_ offsets: IndexSet) {
-        for i in offsets {
-            ICloudProjectStore.deleteFolder(for: projects[i])
-            modelContext.delete(projects[i])
-        }
+        for i in offsets { deleteProject(projects[i]) }
     }
 }
 
