@@ -161,10 +161,9 @@ struct IconEditorView: View {
             .navigationTitle("Icon — \(document.name)")
             .toolbar {
                 ToolbarItemGroup {
-                    Button { modelContext.undoManager?.undo() } label: { Image(systemName: "arrow.uturn.backward") }
-                        .disabled(!(modelContext.undoManager?.canUndo ?? false))
-                    Button { modelContext.undoManager?.redo() } label: { Image(systemName: "arrow.uturn.forward") }
-                        .disabled(!(modelContext.undoManager?.canRedo ?? false))
+                    // Undo/redo arrows removed 2026-06-09: they drove the app-wide UndoManager
+                    // that's been pulled out. Undo is meant to live in the image-history sheet
+                    // (to be built), not in toolbar arrows.
                     Button { exporting = true } label: { Image(systemName: "square.and.arrow.up") }
                 }
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
