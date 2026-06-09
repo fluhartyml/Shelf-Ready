@@ -33,8 +33,10 @@ struct Shelf_ReadyApp: App {
             return try! ModelContainer(for: schema, configurations: [memory])
         }
         let container = makeContainer()
-        // Enable nondestructive undo/redo history across the model (icon layers, etc.).
-        container.mainContext.undoManager = UndoManager()
+        // No app-wide UndoManager. SwiftData's built-in undo snapshots the ENTIRE data store
+        // and crashes when deleting a set (it tries to snapshot the set's lazily-loaded
+        // IconDocument link). It also wasn't the undo Michael wants — his intended undo is a
+        // separate, scoped build, to his own spec. Removed 2026-06-09; ⌘Z is off until then.
         return container
     }()
 
