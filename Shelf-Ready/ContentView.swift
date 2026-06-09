@@ -55,6 +55,10 @@ struct ContentView: View {
                 }
             }
         }
+        .task {
+            await ICloudProjectStore.prepare()
+            ICloudProjectStore.importMissing(into: modelContext)
+        }
     }
 
     private func addProject() {
@@ -64,7 +68,10 @@ struct ContentView: View {
     }
 
     private func deleteProjects(_ offsets: IndexSet) {
-        for i in offsets { modelContext.delete(projects[i]) }
+        for i in offsets {
+            ICloudProjectStore.deleteFolder(for: projects[i])
+            modelContext.delete(projects[i])
+        }
     }
 }
 
@@ -156,12 +163,19 @@ struct ProjectBoardView: View {
         arr.move(fromOffsets: source, toOffset: destination)
         for (i, shot) in arr.enumerated() { shot.order = i }
         project.updatedAt = Date()
+        syncFolder()
     }
 
     private func delete(at offsets: IndexSet) {
         let arr = project.orderedShots
         for i in offsets { modelContext.delete(arr[i]) }
+        project.updatedAt = Date()
+        syncFolder()
     }
+
+    // MARK: iCloud Drive hand-off — mirror this project into its iCloud Drive folder
+    // so it syncs across the user's devices and is browsable in Files/Finder.
+    private func syncFolder() { ICloudProjectStore.export(project) }
 
     private func openIcon() {
         if project.iconDocument == nil {
@@ -205,6 +219,7 @@ struct ProjectBoardView: View {
         }
         project.updatedAt = Date()
         status = "Imported \(added) from Files."
+        syncFolder()
     }
 
     // MARK: Import — a whole folder (Desktop, the apartment archive, an export dump…)
@@ -238,6 +253,7 @@ struct ProjectBoardView: View {
         status = added > 0
             ? "Imported \(added) from \(folder.lastPathComponent)."
             : "No images found in \(folder.lastPathComponent)."
+        syncFolder()
     }
 
     // MARK: Import — Photos album
@@ -255,6 +271,7 @@ struct ProjectBoardView: View {
         photoItems = []
         project.updatedAt = Date()
         status = "Imported \(added) from Photos."
+        syncFolder()
     }
 
     // MARK: Export — numbered, grouped per device class, sized to spec

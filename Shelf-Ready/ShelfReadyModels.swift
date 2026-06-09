@@ -19,6 +19,10 @@ final class ScreenshotProject {
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
 
+    /// Stable cross-device identity — matches this project to its iCloud Drive folder/manifest
+    /// so the same project can be found (and not duplicated) on any device. See [ICloudProjectStore].
+    var projectID: UUID = UUID()
+
     @Relationship(deleteRule: .cascade, inverse: \Shot.project)
     var shots: [Shot]? = []
 
@@ -47,6 +51,10 @@ final class Shot {
 
     var sourceFilename: String?
     var addedAt: Date = Date()
+
+    /// Stable cross-device identity — the image file in the project's iCloud Drive folder is
+    /// named by this UUID, so reordering only rewrites the manifest, never the image.
+    var shotID: UUID = UUID()
 
     /// Upload order within its device-class group (drives the numeric filename prefix).
     var order: Int = 0
