@@ -228,13 +228,18 @@
 
  HISTORY MODEL = LINEAR  (Photoshop-style; decided 2026-06-09 — Claude's recommendation, Michael
  agreed):
- • Click any history step to jump the image back to that state.
- • Making a NEW edit from that point DROPS everything that was ahead of it (replace-forward).
+ • Entries are GROUPED BY TOOL, each group a reveal carat ">". Expand a tool's ">" to see its
+   individual actions — e.g. when drawing pixel art, every dot placed with the pencil is one
+   stroke nested under that pencil group (keeps the list tidy instead of one row per dot).
+ • LINEAR step-back, navigable down to a single pixel: PICK any entry — a tool group OR an
+   individual stroke/pixel under a reveal — and EVERYTHING FORWARD OF IT IS DROPPED; you resume
+   from that point. "Picking a pixel" IS the step-back. There is NO surgical mid-delete — you
+   cannot pull one stroke out of the middle and keep the later ones.
  • Simple, proven, predictable.
- • REJECTED ALTERNATIVE — "surgical pick-and-delete" (checkmark arbitrary middle entries, trash
-   only those, regenerate the rest). More powerful but NOT how Photoshop works, and it carries a
-   genuinely hard DEPENDENT-EDIT problem (pull a fill out from under a later stroke -> undefined
-   result). Set aside as a "maybe later"; going linear-first does NOT close the door to it.
+ • REJECTED ALTERNATIVE — "surgical pick-and-delete" (delete arbitrary middle entries, keep the
+   rest, regenerate). More powerful but NOT how Photoshop works, and it carries a genuinely hard
+   DEPENDENT-EDIT problem (pull a fill out from under a later stroke -> undefined result). Set
+   aside; we confirmed picking-an-entry = step-back, which is the linear behavior.
 
  LAYER LIST INTERACTIONS  (front sheet):
  • DELETE a layer — ONE AT A TIME (right-click -> Delete, like the asset-set list; NOT multi-
@@ -249,10 +254,15 @@
  BUILD STATUS (2026-06-09): the IMAGE-HISTORY sheet DOES NOT EXIST YET. The layer list is a
  single panel today; the swipe-to-reveal and the history list are all still to build.
 
- STILL OPEN (decide before building the history sheet):
- • What is ONE history entry — one tool operation (a pencil stroke, a fill, a line)? (granularity)
- • Does the history PERSIST across closing/reopening the icon, or reset each session?
- • Is there a CLEAR / purge-history action?
+ RESOLVED (2026-06-09):
+ • GRANULARITY — entries group BY TOOL (reveal carats); inside a group, one tool action = one
+   stroke/pixel (a pencil dot, a fill, a line).
+ • PERSISTENCE — the history is PERSISTENT from the moment the icon is created, across every
+   close/reopen. It never auto-resets.
+ • PURGE HISTORY — the ONLY thing that clears the history. It KEEPS the current image exactly
+   as-is and clears the past trail (you lose the trail, not the work). Rarely used — icon edits
+   are tiny so storage is a non-issue (Photoshop's purge existed for scarce RAM/scratch disk,
+   which no longer applies). So tuck it in a menu behind a confirm, NOT a prominent button.
 
  ============================================================================================
  ROADMAP
