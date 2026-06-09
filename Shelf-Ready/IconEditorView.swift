@@ -37,13 +37,21 @@ private let iconPalette = ["#FFFFFF", "#000000", "#0A84FF", "#32D7FF", "#5E5CE6"
 
 struct IconCanvasView: View {
     let document: IconDocument
+    var mode: IconAppearance = .light
 
     var body: some View {
         GeometryReader { geo in
             let edge = min(geo.size.width, geo.size.height)
             ZStack {
-                Color(hexString: document.backgroundHex)
-                ForEach(document.orderedLayers) { layer in
+                // Opaque base = the background layer for this mode (falls back to the legacy
+                // document color for icons created before background layers existed).
+                if let bg = document.orderedLayers.first(where: { $0.kind == .background && $0.appearance == mode }) {
+                    Color(hexString: bg.colorHex)
+                } else {
+                    Color(hexString: document.backgroundHex)
+                }
+                // Content layers (everything that isn't a background) composite on top with alpha.
+                ForEach(document.orderedLayers.filter { $0.kind != .background }) { layer in
                     if layer.isVisible {
                         IconLayerContent(layer: layer, edge: edge)
                     }
@@ -85,6 +93,8 @@ struct IconLayerContent: View {
             } else {
                 Color.clear
             }
+        case .background:
+            Color(hexString: layer.colorHex)   // full-canvas opaque base (filtered out of the content loop)
         }
     }
 }
@@ -97,6 +107,7 @@ struct IconEditorView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var selected: IconLayer?
+    @State private var previewMode: IconAppearance = .light
     @State private var exporting = false
     @State private var editingPixels = false
     @State private var pickingSymbol = false
@@ -109,11 +120,16 @@ struct IconEditorView: View {
             HStack(spacing: 0) {
                 // Canvas
                 VStack(spacing: 8) {
-                    IconCanvasView(document: document)
+                    IconCanvasView(document: document, mode: previewMode)
                         .frame(width: canvasEdge, height: canvasEdge)
                         .background(.quaternary)
                         .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.secondary))
                         .gesture(dragSelected)
+                    Picker("Preview", selection: $previewMode) {
+                        Text("Light").tag(IconAppearance.light)
+                        Text("Dark").tag(IconAppearance.dark)
+                    }
+                    .pickerStyle(.segmented).labelsHidden().frame(width: 180)
                     Text("Renders at 1024 × 1024").font(.caption).foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity)
@@ -211,41 +227,48 @@ struct IconEditorView: View {
 
     @ViewBuilder private func inspector(for layer: IconLayer) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            if layer.kind == .symbol {
-                Button { pickingSymbol = true } label: {
-                    Label { Text("Choose Symbol…") } icon: { Image(systemName: layer.symbolName ?? "star.fill") }
-                }
-                .buttonStyle(.borderedProminent)
-                TextField("…or type an exact SF Symbol name", text: Binding(
-                    get: { layer.symbolName ?? "" },
-                    set: { layer.symbolName = $0 }))
-                    .textFieldStyle(.roundedBorder)
-                Text("Symbol color").font(.caption)
+            Text("Layer name").font(.caption)
+            TextField("Layer name", text: Binding(get: { layer.name }, set: { layer.name = $0 }))
+                .textFieldStyle(.roundedBorder)
+
+            if layer.kind == .background {
+                // Backgrounds are the opaque base — color only, no transform.
+                Text("Background color").font(.caption)
                 swatches(Binding(get: { layer.colorHex }, set: { layer.colorHex = $0 }))
-            }
-            if layer.kind == .pixel {
-                Text("Grid").font(.caption)
-                Picker("Grid", selection: Binding(
-                    get: { layer.pixelGridSize },
-                    set: { newSize in
-                        guard newSize != layer.pixelGridSize else { return }
-                        layer.pixelGridSize = newSize
-                        layer.pixelData = PixelGrid.blank(size: newSize)   // resizing clears the grid
-                    })) {
-                    Text("64").tag(64); Text("128").tag(128)
+            } else {
+                if layer.kind == .symbol {
+                    Button { pickingSymbol = true } label: {
+                        Label { Text("Choose Symbol…") } icon: { Image(systemName: layer.symbolName ?? "star.fill") }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    TextField("…or type an exact SF Symbol name", text: Binding(
+                        get: { layer.symbolName ?? "" },
+                        set: { layer.symbolName = $0 }))
+                        .textFieldStyle(.roundedBorder)
+                    Text("Symbol color").font(.caption)
+                    swatches(Binding(get: { layer.colorHex }, set: { layer.colorHex = $0 }))
                 }
-                .pickerStyle(.segmented).labelsHidden()
-                Button { editingPixels = true } label: {
-                    Label("Edit Pixels…", systemImage: "paintbrush.pointed.fill")
+                if layer.kind == .pixel {
+                    Text("Grid").font(.caption)
+                    Picker("Grid", selection: Binding(
+                        get: { layer.pixelGridSize },
+                        set: { newSize in
+                            guard newSize != layer.pixelGridSize else { return }
+                            layer.pixelGridSize = newSize
+                            layer.pixelData = PixelGrid.blank(size: newSize)   // resizing clears the grid
+                        })) {
+                        Text("64").tag(64); Text("128").tag(128)
+                    }
+                    .pickerStyle(.segmented).labelsHidden()
+                    Button { editingPixels = true } label: {
+                        Label("Edit Pixels…", systemImage: "paintbrush.pointed.fill")
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
-                .buttonStyle(.borderedProminent)
+                slider("Size", Binding(get: { layer.scale }, set: { layer.scale = $0 }), 0.1...1.0)
+                slider("Rotate", Binding(get: { layer.rotationDegrees }, set: { layer.rotationDegrees = $0 }), 0...360)
+                slider("Opacity", Binding(get: { layer.opacity }, set: { layer.opacity = $0 }), 0...1)
             }
-            slider("Size", Binding(get: { layer.scale }, set: { layer.scale = $0 }), 0.1...1.0)
-            slider("Rotate", Binding(get: { layer.rotationDegrees }, set: { layer.rotationDegrees = $0 }), 0...360)
-            slider("Opacity", Binding(get: { layer.opacity }, set: { layer.opacity = $0 }), 0...1)
-            Divider()
-            Text("Background").font(.caption)
-            swatches(Binding(get: { document.backgroundHex }, set: { document.backgroundHex = $0 }))
         }
     }
 
@@ -294,9 +317,10 @@ struct IconEditorView: View {
 
     private func rowSymbol(for layer: IconLayer) -> String {
         switch layer.kind {
-        case .symbol: return layer.symbolName ?? "star.fill"
-        case .image:  return "photo"
-        case .pixel:  return "square.grid.3x3.fill"
+        case .symbol:     return layer.symbolName ?? "star.fill"
+        case .image:      return "photo"
+        case .pixel:      return "square.grid.3x3.fill"
+        case .background: return layer.appearance == .dark ? "moon.fill" : "sun.max.fill"
         }
     }
 
@@ -385,7 +409,7 @@ struct PixelPaintView: View {
 
     /// Visible layers that sit BELOW this pixel layer — shown as live editing context.
     private var layersBelow: [IconLayer] {
-        document.orderedLayers.filter { $0.isVisible && $0.order < layer.order }
+        document.orderedLayers.filter { $0.isVisible && $0.order < layer.order && $0.kind != .background }
     }
 
     var body: some View {

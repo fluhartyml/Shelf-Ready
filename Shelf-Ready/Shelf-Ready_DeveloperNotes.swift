@@ -251,6 +251,22 @@
  • MULTI-SELECT (checkmarks) is for LAYER GROUPING / LOCKING — a SEPARATE future feature, NOT
    deletion. Don't conflate the two.
 
+ DEFAULT LAYERS & TRANSPARENCY MODEL  (designed with Michael 2026-06-09):
+ • A brand-new icon starts with THREE named layers (every layer name is USER-EDITABLE):
+     1. "Light Mode Background" — opaque fill, shown in light mode
+     2. "Dark Mode Background"  — opaque fill, shown in dark mode
+     3. "Icon"                  — the (transparent) artwork on top
+ • The two backgrounds are MODE VARIANTS, not stacked: the Light one shows in light mode, the
+   Dark one in dark mode, NEVER both at once. The Icon layer rides on whichever is active.
+ • TRANSPARENCY RULE: every NON-background layer carries real alpha — clear where empty,
+   populated color where drawn. A normal layer must NOT have its own opaque background fill, or
+   it would hide everything beneath it (back to a flattened image with no see-through). ONLY the
+   two Background layers are solid/opaque — they are what STOPS transparency from reaching the
+   final image.
+ • SAVE = FLATTEN x2: flatten the transparent layers onto each background — onto Light -> the
+   opaque light icon, onto Dark -> the opaque dark icon. Two flattened, fully-opaque outputs
+   (App-Store-legal; the final icon can carry no alpha).
+
  BUILD STATUS (2026-06-09): the IMAGE-HISTORY sheet DOES NOT EXIST YET. The layer list is a
  single panel today; the swipe-to-reveal and the history list are all still to build.
 

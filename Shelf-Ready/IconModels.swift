@@ -42,12 +42,21 @@ final class IconDocument {
     }
 }
 
+/// Light/Dark are mutually-exclusive mode variants for a background layer: the editor shows one
+/// at a time, and Save flattens both. (See the icon-layer model in the DeveloperNotes.)
+enum IconAppearance: String, Codable, CaseIterable, Hashable { case light, dark }
+
 @Model
 final class IconLayer {
-    enum Kind: String, Codable, CaseIterable { case symbol, image, pixel }
+    enum Kind: String, Codable, CaseIterable { case symbol, image, pixel, background }
 
     var order: Int = 0
     var kindRaw: String = "symbol"
+
+    /// User-editable layer name. Empty -> fall back to the kind-based default (see displayName).
+    var name: String = ""
+    /// For .background layers: which appearance this background is shown in (light/dark); nil otherwise.
+    var appearanceRaw: String?
 
     /// Symbol layer: an SF Symbol name (Michael builds icons mainly from SF Symbols in layers).
     var symbolName: String?
@@ -84,11 +93,18 @@ final class IconLayer {
         set { kindRaw = newValue.rawValue }
     }
 
+    var appearance: IconAppearance? {
+        get { appearanceRaw.flatMap(IconAppearance.init(rawValue:)) }
+        set { appearanceRaw = newValue?.rawValue }
+    }
+
     var displayName: String {
+        if !name.isEmpty { return name }
         switch kind {
-        case .symbol: return symbolName ?? "Symbol"
-        case .image:  return "Image"
-        case .pixel:  return "Pixel \(pixelGridSize)×\(pixelGridSize)"
+        case .symbol:     return symbolName ?? "Symbol"
+        case .image:      return "Image"
+        case .pixel:      return "Pixel \(pixelGridSize)×\(pixelGridSize)"
+        case .background: return appearance == .dark ? "Dark Mode Background" : "Light Mode Background"
         }
     }
 }

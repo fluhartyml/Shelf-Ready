@@ -41,6 +41,7 @@ struct ContentView: View {
                 .onDelete(perform: deleteProjects)
             }
             .navigationTitle("Shelf-Ready")
+            .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 360)
             .safeAreaInset(edge: .bottom) {
                 // New Asset Set lives in the sidebar BODY, not the toolbar — a lone sidebar
                 // toolbar item collapses into a ">>" overflow when the column is narrow (the
@@ -198,6 +199,18 @@ struct ProjectBoardView: View {
             let doc = IconDocument(name: project.name.isEmpty ? "App Icon" : "\(project.name) Icon")
             modelContext.insert(doc)
             project.iconDocument = doc
+            // Seed the three default named layers: two opaque mode-variant backgrounds (which stop
+            // transparency from reaching the final icon) + a transparent Icon layer on top.
+            let light = IconLayer(kind: .background)
+            light.name = "Light Mode Background"; light.appearance = .light; light.colorHex = "#FFFFFF"; light.order = 0
+            let dark = IconLayer(kind: .background)
+            dark.name = "Dark Mode Background"; dark.appearance = .dark; dark.colorHex = "#000000"; dark.order = 1
+            let icon = IconLayer(kind: .pixel)
+            icon.name = "Icon"; icon.scale = 1.0; icon.order = 2
+            for layer in [light, dark, icon] {
+                layer.document = doc
+                modelContext.insert(layer)
+            }
         }
         showingIcon = true
     }
