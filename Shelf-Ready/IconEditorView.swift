@@ -142,6 +142,13 @@ struct IconEditorView: View {
                                 }.buttonStyle(.borderless)
                             }
                             .tag(layer)
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    deleteLayer(layer)
+                                } label: {
+                                    Label("Delete Layer", systemImage: "trash")
+                                }
+                            }
                         }
                         .onDelete(perform: deleteLayers)
                         .onMove(perform: moveLayers)
@@ -293,9 +300,14 @@ struct IconEditorView: View {
         }
     }
 
+    private func deleteLayer(_ layer: IconLayer) {
+        if selected?.persistentModelID == layer.persistentModelID { selected = nil }
+        modelContext.delete(layer)
+    }
+
     private func deleteLayers(_ offsets: IndexSet) {
         let arr = document.orderedLayers
-        for i in offsets { modelContext.delete(arr[i]) }
+        for i in offsets { deleteLayer(arr[i]) }
     }
 
     private func moveLayers(from source: IndexSet, to dest: Int) {
