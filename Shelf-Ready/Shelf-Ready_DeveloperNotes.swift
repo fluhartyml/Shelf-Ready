@@ -214,6 +214,47 @@
    Apple before building Generate Icon Set.
 
  ============================================================================================
+ ICON EDITOR — IMAGE HISTORY, UNDO & LAYER INTERACTIONS  (designed with Michael 2026-06-09)
+ ============================================================================================
+ UNDO IS NOT A SEPARATE FEATURE. No ⌘Z command, no undo/redo buttons — BOTH the app-wide
+ SwiftData UndoManager and the toolbar arrows were REMOVED 2026-06-09 (the undo manager
+ snapshotted the whole store and crashed deletes; the arrows were the wrong paradigm). Undo is
+ a natural BYPRODUCT of the IMAGE-HISTORY sheet.
+
+ THE TWO SHEETS  (the icon editor's right-hand panel is a swipeable pair):
+ • FRONT sheet = the LAYER LIST.
+ • BEHIND it = the IMAGE-HISTORY sheet, revealed by SWIPING THE LAYER LIST OUT OF THE WAY —
+   a Photoshop-style chronological list of the edits made to the image.
+
+ HISTORY MODEL = LINEAR  (Photoshop-style; decided 2026-06-09 — Claude's recommendation, Michael
+ agreed):
+ • Click any history step to jump the image back to that state.
+ • Making a NEW edit from that point DROPS everything that was ahead of it (replace-forward).
+ • Simple, proven, predictable.
+ • REJECTED ALTERNATIVE — "surgical pick-and-delete" (checkmark arbitrary middle entries, trash
+   only those, regenerate the rest). More powerful but NOT how Photoshop works, and it carries a
+   genuinely hard DEPENDENT-EDIT problem (pull a fill out from under a later stroke -> undefined
+   result). Set aside as a "maybe later"; going linear-first does NOT close the door to it.
+
+ LAYER LIST INTERACTIONS  (front sheet):
+ • DELETE a layer — ONE AT A TIME (right-click -> Delete, like the asset-set list; NOT multi-
+   select). Today it's wired only via .onDelete (iOS swipe) -> no Mac affordance yet; it needs
+   the same right-click/trashcan the asset-set list got in ContentView.
+ • REORDER — drag (wired via .onMove -> moveLayers). Mac drag affordance is shaky (same class of
+   gap as delete); works on iPad.
+ • VISIBILITY — per-layer eye toggle (wired).
+ • MULTI-SELECT (checkmarks) is for LAYER GROUPING / LOCKING — a SEPARATE future feature, NOT
+   deletion. Don't conflate the two.
+
+ BUILD STATUS (2026-06-09): the IMAGE-HISTORY sheet DOES NOT EXIST YET. The layer list is a
+ single panel today; the swipe-to-reveal and the history list are all still to build.
+
+ STILL OPEN (decide before building the history sheet):
+ • What is ONE history entry — one tool operation (a pencil stroke, a fill, a line)? (granularity)
+ • Does the history PERSIST across closing/reopening the icon, or reset each session?
+ • Is there a CLEAR / purge-history action?
+
+ ============================================================================================
  ROADMAP
  ============================================================================================
  v0.1 (now) ▸ spec model ✓ · resize engine ✓ · models ✓ · screenshot board ✓ · icon editor
