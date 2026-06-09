@@ -166,6 +166,54 @@
  • Shelf_ReadyApp.swift        — app entry; SwiftData container + UndoManager (per-layer undo).
 
  ============================================================================================
+ ASSET WORKFLOW — LOCKED DESIGN  (worked out with Michael 2026-06-09)
+ ============================================================================================
+ The authoritative spec for how an asset set turns into a submission. The detail view is TWO
+ differentiated sections — ICON on top, SCREENSHOTS below — each a group with a reveal carat
+ ">" and drag-and-drop ordering. Both halves write their output into the set's iCloud Drive
+ project folder (the durable, browsable, cross-device home; see ICloudProjectStore.swift).
+
+ SCREENSHOTS
+ -----------
+ • Input: import from Photos / Files / "From Folder" (point at a folder — Desktop, an export
+   dump, the apartment archive — and pull every image in filename order).
+ • Organize: grouped by DEVICE (iPhone / iPad / Apple TV / macOS …); each group has a reveal
+   carat ">"; inside a group, drag-and-drop sets the order the user wants.
+ • Resize: AUTO-resize each shot to the exact App Store Connect pixel spec for its device
+   target. Per-shot MANUAL OVERRIDE via two fields  [ NNNN ] x [ NNNN ]  under each draggable
+   shot, pre-filled with the predetermined size, editable. The override RESAMPLES STRAIGHT to
+   the typed pixels. RESIZE ONLY — NEVER CROP (the whole image is always kept; nothing is cut
+   off). Rationale: ASC is finicky and rejects off-by-one sizes (e.g. a 6.5" simulator shot
+   landing at 1242x2689 instead of 2688) — exact resize fixes it; the override lets the user
+   force any exact accepted size.
+ • Naming: "{NN} {device} {asset set name}" — ZERO-PADDED (01..10), numbered PER DEVICE GROUP,
+   auto-generated on add and REWRITTEN on reorder. e.g. "01 iPhone Shelf Project". Purpose: in
+   the ASC upload picker the user selects 01 -> 10 in sequence and they upload in that order.
+ • Output: written to the set's iCloud Drive project folder.
+
+ ICONS  (assumes PRODUCTION-READY icons — all generation/editing already complete; the layered
+ icon editor is a SEPARATE concern, out of scope for this packaging flow)
+ --------------------------------------------------------------------------------------------
+ • Three appearance WELLS, exactly as Xcode's AppIcon asset page labels them:
+   ANY APPEARANCE (light/default), DARK, TINTED.
+   NOTE: Michael's word "clear" == the TINTED well. VERIFY against Apple whether iOS 26 /
+   Liquid Glass adds a SEPARATE "Clear" appearance distinct from Tinted before building.
+ • The user drags a finished icon into the correct appearance well and can move it between
+   wells; confirms placement.
+ • "GENERATE ICON SET" button -> produces the required sizes and saves them into the set's
+   iCloud Drive project folder. Sizes (VERIFY against Apple post-WWDC): iOS = a single 1024
+   per appearance; macOS = the full ladder (16/32/128/256/512 @ 1x/2x).
+ • Generated icon file names: "{light/dark/tinted} {NNNNxNNNN}px {asset set name}".
+   e.g. "light 1024x1024px Shelf Project", "dark 512x512px Shelf Project".
+ • The user opens the iCloud Drive folder and DRAGS each file into the matching well in Xcode's
+   AppIcon asset page. Shelf-Ready does NOT write into the .xcassets itself.
+
+ APPLE IS THE SOURCE OF TRUTH — VERIFY, DON'T ASSUME (Michael's standing rule):
+ • Re-verify the iPhone screenshot pixel spec (6.9" = 1320x2868) against Apple post-WWDC 2026.
+ • Verify the icon appearance set (Any/Dark/Tinted, +Clear?) and the required size set against
+   Apple before building Generate Icon Set.
+
+ ============================================================================================
  ROADMAP
  ============================================================================================
  v0.1 (now) ▸ spec model ✓ · resize engine ✓ · models ✓ · screenshot board ✓ · icon editor
