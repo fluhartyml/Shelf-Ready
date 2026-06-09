@@ -75,6 +75,7 @@ struct ProjectBoardView: View {
     @Environment(\.modelContext) private var modelContext
 
     @State private var importingFiles = false
+    @State private var importingFolder = false
     @State private var exporting = false
     @State private var photoItems: [PhotosPickerItem] = []
     @State private var zoomShot: Shot?
@@ -101,7 +102,8 @@ struct ProjectBoardView: View {
             ToolbarItemGroup {
                 Menu {
                     Button { showPhotos = true } label: { Label("From Photos", systemImage: "photo.on.rectangle") }
-                    Button { importingFiles = true } label: { Label("From Files", systemImage: "folder") }
+                    Button { importingFiles = true } label: { Label("From Files", systemImage: "doc") }
+                    Button { importingFolder = true } label: { Label("From Folder", systemImage: "folder") }
                 } label: {
                     Label("Add Screenshots", systemImage: "plus")
                 }
@@ -123,6 +125,9 @@ struct ProjectBoardView: View {
         .fileImporter(isPresented: $importingFiles,
                       allowedContentTypes: [.png, .jpeg, .image],
                       allowsMultipleSelection: true) { handleFileImport($0) }
+        .fileImporter(isPresented: $importingFolder,
+                      allowedContentTypes: [.folder],
+                      allowsMultipleSelection: false) { handleFolderImport($0) }
         .fileImporter(isPresented: $exporting,
                       allowedContentTypes: [.folder]) { handleExport($0) }
         .photosPicker(isPresented: $showPhotos, selection: $photoItems, matching: .images)
@@ -200,6 +205,39 @@ struct ProjectBoardView: View {
         }
         project.updatedAt = Date()
         status = "Imported \(added) from Files."
+    }
+
+    // MARK: Import — a whole folder (Desktop, the apartment archive, an export dump…)
+    // Point at a folder and pull every image inside it in filename order — fits the
+    // Xcode/simulator "screenshots dumped on the Desktop" and macOS-app-shots workflows,
+    // so you don't hand-pick ten files. On the Mac this needs the user-selected-files
+    // entitlement (already on), and the folder's security scope covers the files inside it.
+
+    private func handleFolderImport(_ result: Result<[URL], Error>) {
+        guard case .success(let urls) = result, let folder = urls.first else { return }
+        let access = folder.startAccessingSecurityScopedResource()
+        defer { if access { folder.stopAccessingSecurityScopedResource() } }
+
+        let imageExtensions: Set<String> = ["png", "jpg", "jpeg", "heic", "heif", "tiff", "tif"]
+        let contents = (try? FileManager.default.contentsOfDirectory(
+            at: folder,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles])) ?? []
+        let images = contents
+            .filter { imageExtensions.contains($0.pathExtension.lowercased()) }
+            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+
+        var added = 0
+        var nextOrder = (project.shots ?? []).count
+        for url in images {
+            guard let data = try? Data(contentsOf: url) else { continue }
+            addShot(data: data, filename: url.lastPathComponent, order: nextOrder)
+            nextOrder += 1; added += 1
+        }
+        project.updatedAt = Date()
+        status = added > 0
+            ? "Imported \(added) from \(folder.lastPathComponent)."
+            : "No images found in \(folder.lastPathComponent)."
     }
 
     // MARK: Import — Photos album
